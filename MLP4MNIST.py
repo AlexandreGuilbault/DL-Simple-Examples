@@ -89,7 +89,7 @@ output = model(images)
 
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.01)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 for epoch in range(1, n_epochs+1):
     train_running_loss = 0.0
