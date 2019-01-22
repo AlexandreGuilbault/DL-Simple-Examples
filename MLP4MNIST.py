@@ -51,17 +51,18 @@ plt.imshow(np.transpose(images, (1, 2, 0)))
 #####################
 # Define Model
 class SimpleMLP(nn.Module):
-    def __init__(self, n_color_channels, n_inputs, n_outputs):
+    def __init__(self, n_color_channels, n_inputs, n_outputs, dropout_probability=0.5):
         super(SimpleMLP, self).__init__()
 
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
         self.n_color_channels = n_color_channels
+        self.dropout_probability = dropout_probability
             
         self.l1 = nn.Linear(self.n_color_channels*self.n_inputs**2,  self.n_color_channels*self.n_inputs**2*2) 
         self.l2 = nn.Linear(self.n_color_channels*self.n_inputs**2*2, self.n_outputs)
         
-        self.dropout = nn.Dropout(dropout_probability)
+        self.dropout = nn.Dropout(self.dropout_probability)
         
     def forward(self, X):
         X = F.relu(self.l1(X.view(-1, self.n_color_channels*self.n_inputs**2)))

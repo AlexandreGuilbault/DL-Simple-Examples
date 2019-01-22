@@ -51,12 +51,13 @@ plt.imshow(np.transpose(images, (1, 2, 0)))
 #####################
 # Define Model
 class SimpleCNN(nn.Module):
-    def __init__(self, n_color_channels, n_inputs, n_outputs):
+    def __init__(self, n_color_channels, n_inputs, n_outputs, dropout_probability=0.5):
         super(SimpleCNN, self).__init__()
         
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
         self.n_color_channels = n_color_channels
+        self.dropout_probability = dropout_probability
         
         # CNN output_size = (input_size - kernel_size + 2*padding)/stride_size + 1
         
@@ -64,7 +65,7 @@ class SimpleCNN(nn.Module):
         self.conv = nn.Conv2d(self.n_color_channels, 8, kernel_size=4, stride=2, padding=1) 
         # 8x14x14
         self.ll = nn.Linear(self.n_color_channels*self.n_inputs**2*2, self.n_outputs) 
-        self.dropout = nn.Dropout(dropout_probability)
+        self.dropout = nn.Dropout(self.dropout_probability)
         
     def forward(self, X):
  
