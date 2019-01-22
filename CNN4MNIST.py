@@ -50,29 +50,33 @@ plt.imshow(np.transpose(images, (1, 2, 0)))
 
 #####################
 # Define Model
-class SimpleMLP(nn.Module):
+class SimpleCNN(nn.Module):
     def __init__(self, n_color_channels, n_inputs, n_outputs):
-        super(SimpleMLP, self).__init__()
-
+        super(SimpleCNN, self).__init__()
+        
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
         self.n_color_channels = n_color_channels
-            
-        self.l1 = nn.Linear(self.n_color_channels*self.n_inputs**2,  self.n_color_channels*self.n_inputs**2*2) 
-        self.l2 = nn.Linear(self.n_color_channels*self.n_inputs**2*2, self.n_outputs)
         
+        # CNN output_size = (input_size - kernel_size + 2*padding)/stride_size + 1
+        
+        # 1x28x28
+        self.conv = nn.Conv2d(self.n_color_channels, 8, kernel_size=4, stride=2, padding=1) 
+        # 8x14x14
+        self.ll = nn.Linear(self.n_color_channels*self.n_inputs**2*2, self.n_outputs) 
         self.dropout = nn.Dropout(dropout_probability)
         
     def forward(self, X):
-        X = F.relu(self.l1(X.view(-1, self.n_color_channels*self.n_inputs**2)))
+ 
+        X = F.relu(self.conv(X.view(-1, 1, self.n_inputs, self.n_inputs)))
         X = self.dropout(X)
-        X = self.l2(X)
+        X = self.ll(X.view(-1, self.n_color_channels*self.n_inputs**2*2))
         
         return X.view(-1, self.n_outputs)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = SimpleMLP(n_color_channels, n_inputs, n_outputs).to(device)
+model = SimpleCNN(n_color_channels, n_inputs, n_outputs).to(device)
 
 ############################
 # Test Model Before Training
@@ -107,7 +111,6 @@ for epoch in range(1, n_epochs+1):
         train_acc += calculate_accuracy(outputs, labels, batch_size)
          
     print('Epoch: {} | Loss: {:.4} | Train Accuracy: {:.1%}'.format(epoch, train_running_loss/i, train_acc/i))
-
 
 model.eval()
 test_acc = 0.0
