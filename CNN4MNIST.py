@@ -8,12 +8,13 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 
+import time
+
 #####################
 # Settings
 batch_size = 64
 n_inputs = 28
 n_outputs = 10
-n_color_channels = 1
 
 n_epochs = 10
 dropout_probability = 0.5
@@ -51,42 +52,44 @@ plt.imshow(np.transpose(images, (1, 2, 0)))
 #####################
 # Define Model
 class SimpleCNN(nn.Module):
-    def __init__(self, n_color_channels, n_inputs, n_outputs, dropout_probability=0.5):
+    def __init__(self, n_inputs, n_outputs, dropout_probability=0.5):
         super(SimpleCNN, self).__init__()
         
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
-        self.n_color_channels = n_color_channels
         self.dropout_probability = dropout_probability
         
-        # CNN output_size = (input_size - kernel_size + 2*padding)/stride_size + 1
-        
         # 1x28x28
-        self.conv = nn.Conv2d(self.n_color_channels, 8, kernel_size=4, stride=2, padding=1) 
-        # 8x14x14
-        self.ll = nn.Linear(self.n_color_channels*self.n_inputs**2*2, self.n_outputs) 
+        self.conv = nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=0) 
+        # 8x26x26
+        self.ll = nn.Linear(8*(self.n_inputs-2)**2, self.n_outputs) # CNN output_size = (input_size - kernel_size + 2*padding)/stride_size + 1
+        
         self.dropout = nn.Dropout(self.dropout_probability)
         
     def forward(self, X):
  
         X = F.relu(self.conv(X.view(-1, 1, self.n_inputs, self.n_inputs)))
         X = self.dropout(X)
-        X = self.ll(X.view(-1, self.n_color_channels*self.n_inputs**2*2))
+        X = self.ll(X.view(-1, 8*(self.n_inputs-2)**2))
+
         
         return X.view(-1, self.n_outputs)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = SimpleCNN(n_color_channels, n_inputs, n_outputs).to(device)
+model = SimpleCNN(n_inputs, n_outputs, dropout_probability).to(device)
 
 ############################
 # Test Model Before Training
-dataiter = iter(trainloader)
-images, labels = dataiter.next()
-output = model(images)
-print(output[0:10])
+
+# dataiter = iter(trainloader)
+# images, labels = dataiter.next()
+# output = model(images)
+# print(output[0:10])
+
 ##################################
 
+start_time = time.time() 
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -96,7 +99,7 @@ for epoch in range(1, n_epochs+1):
     train_acc = 0.0
     model.train()
     
-    for i, data in enumerate(trainloader):
+    for i, data in enumerate(trainloader,1):
         optimizer.zero_grad()
         
         inputs, labels = data
@@ -112,15 +115,19 @@ for epoch in range(1, n_epochs+1):
         train_acc += calculate_accuracy(outputs, labels, batch_size)
          
     print('Epoch: {} | Loss: {:.4} | Train Accuracy: {:.1%}'.format(epoch, train_running_loss/i, train_acc/i))
+    
+training_time = time.time()-start_time
 
 model.eval()
 test_acc = 0.0
-for i, data in enumerate(testloader, 0):
+for i, data in enumerate(testloader, 1):
     
     inputs, labels = data
     inputs = inputs.view(-1, 28, 28)
     
     outputs = model(inputs)
     test_acc += calculate_accuracy(outputs, labels, batch_size)
-        
-print('Test Accuracy: {:.1%}'.format(test_acc/i))
+
+num_parameters = sum(param.numel() for param in model.parameters() if param.requires_grad)
+print('\nCNN\n*******')
+print('Number of parameters : {:,}\nTest accuracy: {:.1%}\nTraining time : {:.1f} seconds'.format(num_parameters, test_acc/i, training_time))
