@@ -67,7 +67,7 @@ class SimpleRNN(nn.Module):
             self.rnn = nn.RNN(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=self.num_layers, dropout=self.dropout_probability, batch_first=True)
         else : # No dropout for last RNN layer
             self.rnn = nn.RNN(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=self.num_layers, batch_first=True)
-        self.ll = nn.Linear(self.hidden_size*self.input_size, output_size)
+        self.ll = nn.Linear(self.seq_length*self.hidden_size, output_size)
         
     def init_hidden(self, batch_size):
         return torch.zeros((self.num_layers, batch_size, self.hidden_size))
@@ -121,7 +121,7 @@ for epoch in range(1, n_epochs+1):
         train_running_loss += loss.detach().item()
         train_acc += calculate_accuracy(outputs, labels, batch_size)
          
-    print('Epoch: {} | Loss: {:.4} | Train Accuracy: {:.1%}'.format(epoch, train_running_loss/i, train_acc/i))
+    print('Epoch: {}/{} | Loss: {:.4} | Train Accuracy: {:.1%}'.format(epoch, n_epochs, train_running_loss/i, train_acc/i))
 training_time = time.time()-start_time
 
 model.eval()

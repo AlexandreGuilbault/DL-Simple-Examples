@@ -110,7 +110,7 @@ for epoch in range(1, n_epochs+1):
         train_running_loss += loss.detach().item()
         train_acc += calculate_accuracy(outputs, labels, batch_size)
          
-    print('Epoch: {} | Loss: {:.4} | Train Accuracy: {:.1%}'.format(epoch, train_running_loss/i, train_acc/i))
+    print('Epoch: {}/{} | Loss: {:.4} | Train Accuracy: {:.1%}'.format(epoch, n_epochs, train_running_loss/i, train_acc/i))
 
 training_time = time.time() - start_time
 
