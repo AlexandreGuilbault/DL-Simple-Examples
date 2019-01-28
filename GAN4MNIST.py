@@ -7,20 +7,17 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 
-import time
-
-
 # Some great ideas taken from here : https://github.com/soumith/ganhacks
 
 
 #####################
 # Settings
-batch_size = 64
+batch_size = 32
 n_inputs = 28
 
 n_epochs = 25
 dropout_probability = 0.5
-learning_rate = 0.002
+learning_rate = 0.0002
 
 z_size = 100
 #####################
@@ -33,7 +30,7 @@ transform = transforms.Compose([transforms.ToTensor()])
 trainset = datasets.MNIST(root='./data', train=True,download=True, transform=transform)
 testset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 
-testloader = utils.data.DataLoader(testset, batch_size=batch_size,shuffle=False, num_workers=0)
+testloader = utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=0)
 trainloader = utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=0)
 
 
@@ -43,21 +40,28 @@ def calculate_accuracy(logit, target, batch_size):
     corrects = (torch.max(logit, 1)[1].view(target.size()).data == target.data).sum()
     return float(corrects)/batch_size
 
-def real_loss(d_out, device='cpu', smooth=False):
+def real_loss(d_out, device='cpu', smoothing=False):
+    # With Label smoothing : Salimans et. al. 2016
     criterion = nn.BCEWithLogitsLoss()
     
-    if smooth: loss = criterion(d_out.squeeze(), torch.ones(d_out.size(0)).to(device)*0.9)
-    else: loss = criterion(nn.BCEWithLogitsLoss(d_out.squeeze(), torch.ones(d_out.size(0)).to(device)))
-                                    
+    if smoothing : loss = criterion(d_out.squeeze(), (torch.rand(d_out.size(0))/2+0.7).to(device))
+    else : loss = criterion(d_out.squeeze(), torch.ones(d_out.size(0)).to(device))
+
     return loss
 
-def fake_loss(d_out, device='cpu', inverse=False):
+def fake_loss(d_out, device='cpu', inverse=False, smoothing=False):
+    # With Label smoothing : Salimans et. al. 2016
     criterion = nn.BCEWithLogitsLoss()
     
-    if inverse : loss = criterion(d_out.squeeze(), torch.ones(d_out.size(0)).to(device))
-    else: loss = criterion(d_out.squeeze(), torch.zeros(d_out.size(0)).to(device))
-    
+    if inverse:
+        if smoothing :loss = criterion(d_out.squeeze(), (torch.rand(d_out.size(0))/2+0.7).to(device))
+        else : loss = criterion(d_out.squeeze(), torch.ones(d_out.size(0)).to(device))
+    else:
+        if smoothing :loss = criterion(d_out.squeeze(), (torch.rand(d_out.size(0))*0.3).to(device))
+        else : loss = criterion(d_out.squeeze(), torch.zeros(d_out.size(0)).to(device))    
+        
     return loss
+
 
 #####################
 # Verify Dataset
@@ -148,22 +152,17 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 discriminator = Discriminator(n_inputs*n_inputs, n_inputs*n_inputs*2, 1).to(device)
 generator = Generator(z_size, n_inputs*n_inputs*2, n_inputs*n_inputs).to(device)
 
-############################
-# Test Model Before Training
+##################################
+# Print to verify both models
 print(discriminator)
 print()
 print(generator)
-# dataiter = iter(trainloader)
-# images, labels = dataiter.next()
-# output = model(images)
-# print(output[0:10])
-
 ##################################
 
-start_time = time.time() 
 
-fixed_z = torch.randn(batch_size, z_size).to(device)
+fixed_z = torch.randn(batch_size, z_size).to(device) # Better to sample from a gaussian distribution
 
+# Use SGD for discriminator and ADAM for generator, See Radford et. al. 2015
 d_optimizer = optim.SGD(discriminator.parameters(),lr=learning_rate)
 g_optimizer = optim.Adam(generator.parameters(),lr=learning_rate)
 
@@ -189,16 +188,16 @@ for epoch in range(1, n_epochs+1):
         d_optimizer.zero_grad()
         
         # Generate fake images
-        z = torch.randn(batch_size, z_size).to(device)
+        z = torch.randn(batch_size, z_size).to(device) # Better to sample from a gaussian distribution
         fake_images = generator(z)
         
         # Discriminator with real images
         d_real = discriminator(real_images)
-        r_loss = real_loss(d_real, device=device, smooth=True)
+        r_loss = real_loss(d_real, device=device, smoothing=True)
 
         # Discriminator with fake images
         d_fake = discriminator(fake_images)
-        f_loss = fake_loss(d_fake, device=device)
+        f_loss = fake_loss(d_fake, device=device, smoothing=True)
         
         d_loss = r_loss + f_loss
 
@@ -212,11 +211,11 @@ for epoch in range(1, n_epochs+1):
         g_optimizer.zero_grad()
         
         # Generate other fake images
-        z = torch.randn(batch_size, z_size).to(device)
+        z = torch.randn(batch_size, z_size).to(device) # Better to sample from a gaussian distribution
         fake_images = generator(z)
         
         d_fake = discriminator(fake_images)
-        g_loss = fake_loss(d_fake, inverse=True, device=device)
+        g_loss = fake_loss(d_fake, inverse=True, device=device, smoothing=True)
 
         # Optimize Generator
         g_loss.backward()
@@ -224,14 +223,14 @@ for epoch in range(1, n_epochs+1):
         
         # Print losses
         if i % 200 == 0:
-            print('Epoch {} | Batch_id {} | d_loss: {:.4f} | g_loss: {:.4f}'.format(epoch, i, d_loss.item(), g_loss.item()))
+            print('Epoch {}/{} | Batch_id {} | d_loss: {:.4f} | g_loss: {:.4f}'.format(epoch, n_epochs, i, d_loss.item(), g_loss.item()))
 
     # Generate and save samples of fake images
     losses.append((d_loss.item(), g_loss.item()))
 
     generator.eval() 
     fake_images = generator(fixed_z)
-    samples.append(fake_images)
+    samples.append(fake_images.detach())
 
 
 #######################
@@ -245,8 +244,12 @@ plt.legend()
 
 ############################################
 # Print generated fake images through epochs
-fig, axes = plt.subplots(figsize=(7,7), nrows=4, ncols=4, sharey=True, sharex=True)
-for ax, img in zip(axes.flatten(), samples[-25]):
-    ax.xaxis.set_visible(False)
-    ax.yaxis.set_visible(False)
-    im = ax.imshow(img.detach().reshape((28,28)), cmap='Greys_r')
+samples_arr = np.stack(samples, axis=0) # shape = [Epoch, Batch Size, Color Channel, Width, Height]
+
+for epoch in range(samples_arr.shape[0]):
+    fig, axes = plt.subplots(figsize=(10,2), nrows=1, ncols=7, sharey=True, sharex=True)
+    for ax, img in zip(axes.flatten(), samples_arr[epoch, 0:7, :, :, :]):
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        im = ax.imshow(img.reshape(28,28), cmap='Greys_r')
+    fig.suptitle("Epoch : {}".format(epoch))
