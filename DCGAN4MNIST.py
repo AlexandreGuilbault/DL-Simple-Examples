@@ -12,14 +12,15 @@ import numpy as np
 
 #####################
 # Settings
-batch_size = 32
+batch_size = 64
 n_inputs = 28
 
-n_epochs = 15
+n_epochs = 10
 dropout_probability = 0.5
 
-learning_rate_discriminator = 0.0008
-learning_rate_generator = 0.0004
+#Two Timescale Update Rule (TTUR) : https://medium.com/beyondminds/advances-in-generative-adversarial-networks-7bad57028032
+learning_rate_discriminator = 0.0005
+learning_rate_generator = 0.0002
 
 z_size = 100
 #####################
@@ -44,7 +45,8 @@ def calculate_accuracy(logit, target, batch_size):
 
 def real_loss(d_out, device='cpu', smoothing=False):
     # With Label smoothing : Salimans et. al. 2016
-    criterion = nn.BCEWithLogitsLoss()
+    # With Least Squares Loss : Mao et. al. 2016
+    criterion = nn.MSELoss()
     
     if smoothing : loss = criterion(d_out.squeeze(), (torch.rand(d_out.size(0))/2+0.7).to(device))
     else : loss = criterion(d_out.squeeze(), torch.ones(d_out.size(0)).to(device))
@@ -53,7 +55,8 @@ def real_loss(d_out, device='cpu', smoothing=False):
 
 def fake_loss(d_out, device='cpu', inverse=False, smoothing=False):
     # With Label smoothing : Salimans et. al. 2016
-    criterion = nn.BCEWithLogitsLoss()
+    # With Least Squares Loss : Mao et. al. 2016
+    criterion = nn.MSELoss()
     
     if inverse:
         if smoothing :loss = criterion(d_out.squeeze(), (torch.rand(d_out.size(0))/2+0.7).to(device))
@@ -146,8 +149,6 @@ class Generator(nn.Module):
         x = self.lrelu(self.batch_norm2(self.convt2(x)))
         x = self.dropout(x)
         x = self.tanh(self.convt3(x))
-
-        x = torch.clamp(x, -1, 1)
 
         return x
 
