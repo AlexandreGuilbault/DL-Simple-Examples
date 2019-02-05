@@ -1,8 +1,8 @@
 import torch
 import torchvision
 from torchvision import transforms, datasets
+from torch.utils.data.sampler import SubsetRandomSampler
 from torch import nn, utils
-import torch.nn.functional as F
 import torch.optim as optim
 
 import matplotlib.pyplot as plt
@@ -27,11 +27,19 @@ learning_rate = 0.001
 # Dataset
 transform = transforms.Compose([transforms.ToTensor()])
 
-trainset = datasets.MNIST(root='./data', train=True,download=True, transform=transform)
+trainset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+validset  = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 testset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 
-testloader = utils.data.DataLoader(testset, batch_size=batch_size,shuffle=False, num_workers=0)
-trainloader = utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=0)
+train_len = len(trainset)
+val_len = 10000
+indices = [*range(train_len)]
+np.random.shuffle(indices)
+valid_idx, train_idx = indices[:val_len], indices[val_len:]
+
+trainloader = utils.data.DataLoader(trainset, batch_size=batch_size, sampler=SubsetRandomSampler(train_idx), num_workers=0)
+validloader = utils.data.DataLoader(validset, batch_size=batch_size, sampler=SubsetRandomSampler(valid_idx), num_workers=0)
+testloader = utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=0)
 
 
 #####################
@@ -82,7 +90,7 @@ class SimpleRNN(nn.Module):
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = SimpleRNN(input_size=n_inputs, seq_length=seq_length, hidden_size=128, output_size=n_outputs, num_layers=1, dropout_probability=dropout_probability).to(device)
+model = SimpleRNN(input_size=n_inputs, seq_length=seq_length, hidden_size=64, output_size=n_outputs, num_layers=1, dropout_probability=dropout_probability).to(device)
 
 ############################
 # Test Model Before Training
@@ -102,26 +110,40 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 for epoch in range(1, n_epochs+1):
     train_running_loss = 0.0
-    train_acc = 0.0
+    valid_running_loss = 0.0
+    valid_acc = 0.0
     model.train()
     
-    for i, data in enumerate(trainloader, 1):
+    # Training
+    for i, data in enumerate(trainloader,1):
         optimizer.zero_grad()
-        
+
         inputs, labels = data
         inputs, labels = inputs.to(device), labels.to(device)
 
         outputs = model(inputs)
 
         loss = criterion(outputs, labels)
-        
         loss.backward()
         optimizer.step()
 
         train_running_loss += loss.detach().item()
-        train_acc += calculate_accuracy(outputs, labels, batch_size)
+    
+   # Validation
+    model.eval()
+    for j, data in enumerate(validloader,1):
+        inputs, labels = data
+        inputs, labels = inputs.to(device), labels.to(device)
+        
+        outputs = model(inputs)
+        valid_acc += calculate_accuracy(outputs, labels, batch_size)
+        
+        loss = criterion(outputs, labels)
+        
+        valid_running_loss += loss.detach().item()
          
-    print('Epoch: {}/{} | Loss: {:.4} | Train Accuracy: {:.1%}'.format(epoch, n_epochs, train_running_loss/i, train_acc/i))
+    print('Epoch: {:2d}/{} | Train Loss: {:.4f} | Validation Loss : {:.4f} | Validation Accuracy: {:.1%}'.format(epoch, n_epochs, train_running_loss/i, valid_running_loss/j, valid_acc/j))
+ 
 training_time = time.time()-start_time
 
 model.eval()
@@ -129,7 +151,8 @@ test_acc = 0.0
 for i, data in enumerate(testloader, 1):
     
     inputs, labels = data
-#    inputs = inputs.view(-1, 28, 28)
+    inputs, labels = inputs.to(device), labels.to(device)
+    inputs = inputs.view(-1, 28, 28)
     
     outputs = model(inputs)
     test_acc += calculate_accuracy(outputs, labels, batch_size)
