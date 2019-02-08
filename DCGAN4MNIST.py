@@ -168,8 +168,8 @@ print(generator)
 fixed_z = torch.randn(batch_size, z_size).to(device) # Better to sample from a gaussian distribution
 
 # Use SGD for discriminator and ADAM for generator, See Radford et. al. 2015
-d_optimizer = optim.SGD(discriminator.parameters(),lr=learning_rate_discriminator)
-g_optimizer = optim.Adam(generator.parameters(),lr=learning_rate_generator, weight_decay=1e-10)
+d_optimizer = optim.SGD(discriminator.parameters(), lr=learning_rate_discriminator)
+g_optimizer = optim.Adam(generator.parameters(), lr=learning_rate_generator, weight_decay=1e-10)
 
 samples = []
 losses = []
@@ -228,7 +228,7 @@ for epoch in range(1, n_epochs+1):
         
         # Print losses
         if i % 200 == 0:
-            print('Epoch {}/{} | Batch_id {} | d_loss: {:.4f} | g_loss: {:.4f}'.format(epoch, n_epochs, i, d_loss.item(), g_loss.item()))
+            print('Epoch {:2d}/{} | Batch_id {} | d_loss: {:.4f} | g_loss: {:.4f}'.format(epoch, n_epochs, i, d_loss.item(), g_loss.item()))
 
     # Generate and save samples of fake images
     losses.append((d_loss.item(), g_loss.item()))
