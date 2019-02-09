@@ -1,6 +1,6 @@
 # DL-Simple-Examples
 
-Simple Deep Learning Examples to use as templates and to compare performances.
+Simple Pytorch Deep Learning Examples to use as templates.
 
 ## Datasets
 
